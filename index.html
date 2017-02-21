@@ -3,212 +3,298 @@
     <link rel="stylesheet" href="css/reveal.css">
     <link rel="stylesheet" href="css/fonts.css">
     <link rel="stylesheet" href="css/theme.css">
-    <link rel="stylesheet" href="css/xterm.css"/>
-    <script src="js/xterm.js"></script>
-    <script src="js/xterm/fit.js"></script>
+    <link rel="stylesheet" href="css/ir-custom.css"/>
+    <script src="js/highlight.pack.js"></script>
+    <script>
+      var fragShow = [];
+      var fragHide = [];
+    </script>
   </head>
   <body>
-
-    <div id="watermark">
-      <img src="img/47deg.png" style="width: 60px; height: auto; opacity: 0.7;"/>
-    </div>
-
     <div class="reveal">
       <div class="slides">
 
-        <section>
+        <!-- COVER SLIDE -->
+
+        <section
+          data-background-image="img/jumbotron_pattern2x.png"
+          data-background-size="45px 40px"
+          data-background-repeat="repeat"
+          data-background-transition="fade-in fade-out"
+        >
           <img src="img/navbar_brand2x.png" class="plain"/>
           <h3>class up your config</h3>
-          <div><a href="https://twitter.com/andygscott">@andygscott</a> <a href="https://twitter.com/47deg">@47deg</a></div>
+          <div><small>github: <a href="https://github.com/47deg/case-classy">47deg/case-classy</a></small></div>
+          <div><small>twitter: <a href="https://twitter.com/andygscott">@andygscott</a> <a href="https://twitter.com/47deg">@47deg</a></small></div>
+          <img src="img/47deg.png" class="plain" style="width: 60px; height: auto; opacity: 0.7;"/>
+        </section>
+
+        <!-- GOALS -->
+
+        <section>
+          <h3>Goals</h3>
+          <ul>
+            <li>What's the problem?</li>
+            <li class="fragment">Build a solution using Case Classy</li>
+            <li class="fragment">Learn about arrows and FP</li>
+          </ul>
+        </section>
+
+        <!-- What's the problem -->
+
+        <section>
+          <h2>What's the problem?</h2>
+        </section>
+
+        <section>
+          <pre><code data-trim data-noescape>[unix_http_server]
+file=/tmp/supervisor.sock                       ; path to your socket file
+
+[supervisord]
+logfile=/var/log/supervisord/supervisord.log    ; supervisord log file
+logfile_maxbytes=50MB                           ; maximum size of logfile before rotation
+logfile_backups=10                              ; number of backed up logfiles
+loglevel=error                                  ; info, debug, warn, trace
+pidfile=/var/run/supervisord.pid                ; pidfile location
+nodaemon=false                                  ; run supervisord as a daemon
+minfds=1024                                     ; number of startup file descriptors
+minprocs=200                                    ; number of process descriptors
+user=root                                       ; default user
+childlogdir=/var/log/supervisord/               ; where child log files will live
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface</code></pre>
+        </section>
+
+        <section>
+          <pre><code data-trim data-noescape>application.url = "http://localhost:9000"
+
+play.evolutions.db.default.autoApply=true
+
+db.default.driver=org.postgresql.Driver
+db.default.url="jdbc:postgresql://localhost:5432/scalaexercises_dev"
+db.default.username=scalaexercises_dev_user <span class="fragment" data-fragment-index="1">⬅</span>
+db.default.password=scalaexercises_pass     <span class="fragment" data-fragment-index="1">⬅</span>
+db.default.url=${?DATABASE_URL}</code></pre>
+          <span class="fragment" data-fragment-index="1">sensitive info?</span>
         </section>
 
 
         <section>
-          <h2>what is config?</h2>
+          <pre><code data-trim data-noescape>: ${JAVA_OPTIONS:=-Xmx4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=900m \
+  -Xss1M -XX:+CMSClassUnloadingEnabled}
+: ${JAVA_PROPERTIES:=-Dsbt.ivy.home=$SBT_DIR/ivy2 \
+  -Dsbt.boot.directory=$SBT_DIR/boot -Dsbt.log.format=false \
+  -Dsbt.ivy.home=$SBT_DIR/plugins}
+java $JAVA_OPTIONS $JAVA_PROPERTIES -jar $SBT_JAR "$@"</code></pre>
+          <span class="fragment" data-fragment-index="1">option overrides</span>
+        </section>
+
+        <section id="pre-burn">
+          <h3>loading config</h3>
+          <pre><code class="scala" data-trim data-noescape>trait AkkaClientConfig extends Config {
+  protected val akkaConfig =
+    config.getConfig("akka.http.client")<span class="fragment" data-fragment-index="1">🔥</span>
+}
+trait KafkaConfig extends Config {
+  protected val kafkaConfig = config.getConfig("kafka")<span class="fragment" data-fragment-index="1">🔥</span>
+}
+
+object ServiceConfig extends AkkaServerConfig {
+  protected val http = akkaConfig.getConfig("server")<span class="fragment" data-fragment-index="1">🔥</span>
+  val host = http.getString("host")<span class="fragment" data-fragment-index="1">🔥</span>
+  val port = http.getInt("port")<span class="fragment" data-fragment-index="1">🔥</span>
+  val requestTimeout = http.getString("request-timeout")<span class="fragment" data-fragment-index="1">🔥</span>
+  val systemName = http.getString("system")<span class="fragment" data-fragment-index="1">🔥</span>
+}</code></pre>
+          <h2 class="fragment">ocassionally</h2>
+        </section>
+
+        <section id="burn"
+                 data-background-image="img/elmo-hellfire.gif"
+                 data-background-transition-speed="fast"
+                 data-background-transition="fade-in fade-out"
+                 data-transition="zoom-in fade-out"
+                 data-transition-speed="slow"
+        >
+          <h3>🔥 🔥 🔥 🔥</h3>
+          <pre><code data-trim data-noescape>com.typesafe.config.ConfigException$Missing: No configuration setting found for key 'mongo-async-driver'
+  at com.typesafe.config.impl.SimpleConfig.findKey(SimpleConfig.java:115)
+  at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:136)
+  at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:150)
+  at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:155)
+  at com.typesafe.config.impl.SimpleConfig.getObject(SimpleConfig.java:209)
+  at com.typesafe.config.impl.SimpleConfig.getConfig(SimpleConfig.java:215)
+  at com.typesafe.config.impl.SimpleConfig.getConfig(SimpleConfig.java:33)
+  at reactivemongo.api.MongoDriver$.reactivemongo$api$MongoDriver$$defaultSystem(api.scala:268)
+  at reactivemongo.api.MongoDriver$$anonfun$3.apply(api.scala:231)
+  at reactivemongo.api.MongoDriver$$anonfun$3.apply(api.scala:231)
+  at scala.Option.getOrElse(Option.scala:120)
+  at reactivemongo.api.MongoDriver.<init>(api.scala:231)
+  at play.modules.reactivemongo.ReactiveMongoHelper.driver$lzycompute(ReactiveMongoPlugin.scala:138)
+  at play.modules.reactivemongo.ReactiveMongoHelper.driver(ReactiveMongoPlugin.scala:138)</code></pre>
+        </section>
+
+
+        <section id="nobody">
+          <h2>Catch 22</h2>
+          <h3>nobody wants to...</h3>
+          <ul>
+            <li class="fragment">read stack traces of apps that fail to boot</li>
+            <li class="fragment">trial and error debug your configuration</li>
+            <li class="fragment">spend time writing configuration code</li>
+          </ul>
+        </section>
+
+        <!-- We can do better -->
+
+        <section>
+          <h2>We can build a solution</h2>
+          <i>and we want</i>
+          <br /><br />
+          <ul>
+            <li>an easy to use API</li>
+            <li>Scala as a first class citizen</li>
+            <li>no thrown exceptions</li>
+            <li>descriptive errors</li>
+            <li>purely functional implementation</li>
+          </ul>
+        </section>
+
+        <!-- ADTs -->
+
+        <section id="adts">
+          <h2>ADTs are king</h2>
+          <ul>
+            <li>model configuration as case class hierarchies
+              <br /><div class="fragment">
+                <pre><code data-trim data-noescape>case class Config(host: String, port: Int)</code></pre>
+              </div>
+            </li>
+            <li class="fragment">decode raw configuration into the ADT</li>
+            <li class="fragment">capture errors as an ADT</li>
+        </section>
+
+        <section id="decoder">
+          <h2>Decoder</h2>
+          <pre><code data-trim data-noescape>trait Decoder[A, B] {
+  def apply(a: A): Either[DecodeError, B]
+
+  // ... final implemented methods
+}</code></pre>
+          <h3 class="fragment">Decoders are arrows</h3>
+          <div class="fragment">A -> DecodeError | B</div>
+          <br />
+          <h3 class="fragment">I am lazy</h3>
+          <div class="fragment">A -> B</div>
+        </section>
+
+        <section id="decoder.instance">
+          <h3>Decoder Creation</h3>
+          <pre><code data-trim data-noescape>object Decoder {
+  def instance[A, B](
+    run: A => Either[DecodeError, B]
+  ): Decoder[A, B] = new Decoder[A, B] {
+    override def apply(a: A): Either[DecodeError, B] = run(a)
+  }
+}</code></pre>
+        </section>
+
+        <!-- String -> UUID -->
+
+        <section id="uuid">
+          <h3>Decoding String -> UUID</h3>
+          <pre><code data-trim data-noescape>import classy.core._
+import java.util.UUID
+import scala.util.Try
+
+val decodeUUID: Decoder[String, UUID] = Decoder.instance(value =>
+  Try(UUID.fromString(value)).toOption.toRight(
+    DecodeError.WrongType("UUID", Some(value))))</code></pre>
         </section>
 
         <section>
-          <h3>this...</h3>
-          <pre><code data-trim data-noescape>
-            [unix_http_server]
-            file=/tmp/supervisor.sock                       ; path to your socket file
+          <h4>Decoding String -> UUID</h4>
+          <pre><code data-trim data-noescape>val decodeUUID: Decoder[String, UUID] = Decoder.instance(value =>
+  Try(UUID.fromString(value)).toOption.toRight(
+    DecodeError.WrongType("UUID", Some(value))))</code></pre>
 
-            [supervisord]
-            logfile=/var/log/supervisord/supervisord.log    ; supervisord log file
-            logfile_maxbytes=50MB                           ; maximum size of logfile before rotation
-            logfile_backups=10                              ; number of backed up logfiles
-            loglevel=error                                  ; info, debug, warn, trace
-            pidfile=/var/run/supervisord.pid                ; pidfile location
-            nodaemon=false                                  ; run supervisord as a daemon
-            minfds=1024                                     ; number of startup file descriptors
-            minprocs=200                                    ; number of process descriptors
-            user=root                                       ; default user
-            childlogdir=/var/log/supervisord/               ; where child log files will live
+          <pre><code data-trim data-noescape>decodeUUID("hello")
+// <span class="fragment">Left(WrongType(UUID, Some(hello)))</span>
 
-            [rpcinterface:supervisor]
-            supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
-          </code></pre>
+decodeUUID("world")
+// <span class="fragment">Left(WrongType(UUID, Some(world)))</span>
+
+decodeUUID("123e4567-12d3-a456-466554400000")
+// <span class="fragment">Left(WrongType(UUID, Some(123e4567-12d3-a456-466554400000)))</span>
+
+decodeUUID("123e4567-e89b-12d3-a456-426655440000")
+// <span class="fragment">Right(123e4567-e89b-12d3-a456-426655440000)</span></pre></code>
         </section>
 
-        <section>
-          <h3>and this...</h3>
-          <pre><code data-trim data-noescape>
-            unstarted-push-timeout = 10s
+        <!-- Composition -->
 
-            typed {
-              # Default timeout for typed actor methods with non-void return type
-              timeout = 5s
-            }
+        <section id="compose">
+          <h4>Arrows compose</h4>
+          <pre><code data-trim data-noescape>import classy.config._
+import com.typesafe.config.{ Config, ConfigFactory }
 
-            # Mapping between ´deployment.router' short names to fully qualified class names
-            router.type-mapping {
-              from-code = "akka.routing.NoRouter"
-              round-robin-pool = "akka.routing.RoundRobinPool"
-              round-robin-group = "akka.routing.RoundRobinGroup"
-              random-pool = "akka.routing.RandomPool"
-              random-group = "akka.routing.RandomGroup"
-              balancing-pool = "akka.routing.BalancingPool"
-              smallest-mailbox-pool = "akka.routing.SmallestMailboxPool"
-              broadcast-pool = "akka.routing.BroadcastPool"
-              broadcast-group = "akka.routing.BroadcastGroup"
-              scatter-gather-pool = "akka.routing.ScatterGatherFirstCompletedPool"
-              scatter-gather-group = "akka.routing.ScatterGatherFirstCompletedGroup"
-              tail-chopping-pool = "akka.routing.TailChoppingPool"
-              tail-chopping-group = "akka.routing.TailChoppingGroup"
-              consistent-hashing-pool = "akka.routing.ConsistentHashingPool"
-              consistent-hashing-group = "akka.routing.ConsistentHashingGroup"
-            }
-          </code></pre>
+// Config -> String
+val readIdString: Decoder[Config, String] =
+  readConfig[String]("id")
+
+// (Config -> String) >>> (String -> UUID)
+<span class="fragment">//  Config -> UUID
+val decodeConfig: Decoder[Config, UUID] =
+  readIdString andThen decodeUUID</span>
+
+<span class="fragment">decodeConfig(ConfigFactory.parseString("id = whoops"))</span>
+<span class="fragment">// Left(WrongType(UUID, Some(whoops)))</span>
+<span class="fragment">decodeConfig(ConfigFactory.parseString("id = 123e4567-e89b-12d3-a456-426655440000"))</span>
+<span class="fragment">// Right(123e4567-e89b-12d3-a456-426655440000)</span></code></pre>
         </section>
 
+        <section id="compose2">
+          <h4>composition cont'd</h4>
+          <pre><code data-trim data-noescape>// Config -> UUID
+val decodeConfig: Decoder[Config, UUID] = // ...
 
-        <section>
-          <h3>...or this</h3>
+decodeConfig(ConfigFactory.parseString("id = whoops"))
+// Left(WrongType(UUID, Some(whoops)))
 
-          <pre><code data-trim data-noescape>
-            : ${JAVA_OPTIONS:=-Xmx4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=900m \
-              -Xss1M -XX:+CMSClassUnloadingEnabled}
-            : ${JAVA_PROPERTIES:=-Dsbt.ivy.home=$SBT_DIR/ivy2 \
-              -Dsbt.boot.directory=$SBT_DIR/boot -Dsbt.log.format=false \
-              -Dsbt.ivy.home=$SBT_DIR/plugins}
-            java $JAVA_OPTIONS $JAVA_PROPERTIES -jar $SBT_JAR "$@"
-          </code></pre>
+// (String -> Config) >>> (Config -> UUID)
+<span class="fragment">//  String -> UUID
+val decodeString: Decoder[String, UUID] = decodeConfig.fromString</span>
 
-          <pre><code data-trim data-noescape>
-            application.url = "http://localhost:9000"
-
-            play.evolutions.db.default.autoApply=true
-
-            db.default.driver=org.postgresql.Driver
-            db.default.url="jdbc:postgresql://localhost:5432/scalaexercises_dev"
-            db.default.username=scalaexercises_dev_user
-            db.default.password=scalaexercises_pass
-            db.default.url=${?DATABASE_URL}
-          </code></pre>
-
-        </section>
-
-        <section id="burn">
-          <h3>🔥🔥 and this 🔥🔥</h3>
-          <pre><code data-trim data-noescape>
-            com.typesafe.config.ConfigException$Missing: No configuration setting found for key 'mongo-async-driver'
-              at com.typesafe.config.impl.SimpleConfig.findKey(SimpleConfig.java:115)
-              at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:136)
-              at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:150)
-              at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:155)
-              at com.typesafe.config.impl.SimpleConfig.getObject(SimpleConfig.java:209)
-              at com.typesafe.config.impl.SimpleConfig.getConfig(SimpleConfig.java:215)
-              at com.typesafe.config.impl.SimpleConfig.getConfig(SimpleConfig.java:33)
-              at reactivemongo.api.MongoDriver$.reactivemongo$api$MongoDriver$$defaultSystem(api.scala:268)
-              at reactivemongo.api.MongoDriver$$anonfun$3.apply(api.scala:231)
-              at reactivemongo.api.MongoDriver$$anonfun$3.apply(api.scala:231)
-              at scala.Option.getOrElse(Option.scala:120)
-              at reactivemongo.api.MongoDriver.<init>(api.scala:231)
-              at play.modules.reactivemongo.ReactiveMongoHelper.driver$lzycompute(ReactiveMongoPlugin.scala:138)
-              at play.modules.reactivemongo.ReactiveMongoHelper.driver(ReactiveMongoPlugin.scala:138)
-              at play.modules.reactivemongo.ReactiveMongoHelper.connection$lzycompute(ReactiveMongoPlugin.scala:141)
-              at play.modules.reactivemongo.ReactiveMongoHelper.connection(ReactiveMongoPlugin.scala:139)
-              at play.modules.reactivemongo.ReactiveMongoHelper.db$lzycompute(ReactiveMongoPlugin.scala:143)
-              at play.modules.reactivemongo.ReactiveMongoHelper.db(ReactiveMongoPlugin.scala:143)
-              at play.modules.reactivemongo.ReactiveMongoPlugin$.db(ReactiveMongoPlugin.scala:76)
-          </code></pre>
+<span class="fragment">decodeString("id = whoops")
+// Left(WrongType(UUID, Some(whoops)))</span>
         </section>
 
 
-        <section id="meh">
-          <pre><code data-trim data-noescape>
-            trait AkkaClientConfig extends Config {
-              protected val akkaConfig = config.getConfig("akka.http.client")<span class="fragment" data-fragment-index="1">🔥</span>
-            }
-            trait KafkaConfig extends Config {
-              protected val kafkaConfig = config.getConfig("kafka")<span class="fragment" data-fragment-index="1">🔥</span>
-            }
-
-            object ServiceConfig extends AkkaServerConfig {
-              protected val http = akkaConfig.getConfig("server")<span class="fragment" data-fragment-index="1">🔥</span>
-              val host = http.getString("host")<span class="fragment" data-fragment-index="1">🔥</span>
-              val port = http.getInt("port")<span class="fragment" data-fragment-index="1">🔥</span>
-              val requestTimeout = http.getString("request-timeout")<span class="fragment" data-fragment-index="1">🔥</span>
-              val systemName = http.getString("system")<span class="fragment" data-fragment-index="1">🔥</span>
-            }
-          </code></pre>
-        </section>
-
-        <section>
-          What is case classy?
-        </section>
-
-
-        <section>
-          Slide 1
-          <div id="terminal" style="width:600px; height: 400px; background-color: blue"/>
-          <div class="fragment" id="frag1">frag 1</div>
-          <script class="fragment" id="frag2"></script>
-          <div class="fragment" id="frag3">frag 3</div>
-        </section>
-        <section>Slide 2</section>
-        <section>
-          Slide 3
-          <!-- http://stackoverflow.com/questions/38187779/stepping-through-a-video-file-with-reveal-js?rq=1 -->
-        </section>
       </div>
     </div>
     <script src="js/reveal.js"></script>
     <script>
-
-      var onHide = [];
-      var onShow = [];
-
-      var term = null;
-
-      onShow['frag1'] = function() { term.writeln('Hello $ ') };
-      onShow['frag2'] = function() { term.write('Hello from \033[1;3;31mxterm.js\033[0m $ ') };
-
-
-
+      //onShow['frag1'] = function() { term.writeln('Hello $ ') };
+      //onShow['frag2'] = function() { term.write('Hello from \033[1;3;31mxterm.js\033[0m $ ') };
       Reveal.addEventListener('fragmentshown', function(event) {
         console.log(event.fragment.id);
-        action = onShow[event.fragment.id];
+        action = fragShow[event.fragment.id];
         if (action) action();
       });
       Reveal.addEventListener('fragmenthidden', function(event) {
         console.log(event.fragment.id);
       });
 
-      term = new Terminal({
-        cursorBlink: true
-      });
-      term.open(document.getElementById('terminal'));
-
       Reveal.addEventListener('ready', function(event) {
-        term.fit();
-        term.on('focus', function() { term.blur(); });
-        term.focus();
+
       });
 
       Reveal.initialize({
         transition: 'none'
       });
+
+      hljs.initHighlightingOnLoad();
 
     </script>
   </body>
