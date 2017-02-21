@@ -267,7 +267,276 @@ decodeConfig(ConfigFactory.parseString("id = whoops"))
 val decodeString: Decoder[String, UUID] = decodeConfig.fromString</span>
 
 <span class="fragment">decodeString("id = whoops")
-// Left(WrongType(UUID, Some(whoops)))</span>
+// Left(WrongType(UUID, Some(whoops)))</span></code></pre>
+        </section>
+
+
+        <section id="premap">
+          <ul>
+            <li>It will be boring if I keep decoding with Typesafe's Config</li>
+            <li class="fragment"><i>(it's been done a few times before)</i></li>
+            <br />
+            <li class="fragment">Let's decode from <code>Map[String, String]</code> from scratch</li>
+            <li class="fragment"><i>System/env props are exposed this way</i></li>
+        </section>
+
+        <!-- Map -->
+
+        <section id="map">
+          <h3>Decode from Map</h3>
+          <pre><code data-trim data-noescape>type StringMap = scala.collection.Map[String, String]
+
+def decodeFromMap[T](
+  key: String, expected: String, f: String => T
+): Decoder[StringMap, T] = Decoder.instance(map =>
+  for {
+    raw <- map.get(key).toRight( // get value
+      DecodeError.AtPath(key, DecodeError.Missing))
+    value <- Try(f(raw)).toOption.toRight( // check type
+      DecodeError.AtPath(key, DecodeError.WrongType(expected, Some(raw))))
+  } yield value
+)
+
+<span class="fragment">def decodeStringFromMap(key: String): Decoder[StringMap, String] =
+  decodeFromMap(key, "String", value => value)</span></code></pre>
+        </section>
+
+        <section id="map2">
+          <h3>Decode from Map cont'd</h3>
+          <pre><code data-trim data-noescape>def decodeStringFromMap(key: String): Decoder[StringMap, String] =
+  decodeFromMap(key, "String", value => value)
+def decodeLongFromMap(key: String): Decoder[StringMap, Long] =
+  decodeFromMap(key, "Long", _.toLong)
+def decodeBooleanFromMap(key: String): Decoder[StringMap, Boolean] =
+  decodeFromMap(key, "Boolean", _.toBoolean)
+
+<span class="fragment">// Map[String, String] -> Long
+val decodeFooLong: Decoder[StringMap, Long] =
+  decodeLongFromMap("foo")
+// Map[String, String] -> String
+val decodeBarString: Decoder[StringMap, String] =
+  decodeStringFromMap("bar")</span></code></pre>
+        </section>
+
+        <section id="map3">
+          <h3>Decode from Map cont'd</h3>
+          <pre><code data-trim data-noescape>decodeFooLong(Map("hello" -> "world"))
+// <span class="fragment">Left(AtPath(foo, Missing))</span>
+
+decodeFooLong(Map("foo" -> "world"))
+// <span class="fragment">Left(AtPath(foo, WrongType(Long, Some(world))))</span>
+
+decodeFooLong(Map("foo" -> "1000"))
+// <span class="fragment">Right(1000)</span>
+
+decodeBarString(Map("bar" -> "it's bar"))
+// <span class="fragment">Right(it's bar)</span></code></pre>
+        </section>
+
+        <section id="map-adt">
+          <h3>ADTs</h3>
+          <pre><code data-trim data-noescape>case class FooBar(foo: Long, bar: String)
+
+// We already have (Map[String, String] -> String)
+// and (Map[String, String] -> Long) for our keys
+val decodeFooLong: Decoder[StringMap, Long] = // ...
+val decodeBarString: Decoder[StringMap, String] = // ...
+
+<span class="fragment">// (Map[String, String] -> Long) * (Map[String, String] -> String)
+//  StringMap -> (Long, String)</span>
+<span class="fragment">val fooBarTupleDecoder: Decoder[StringMap, (Long, String)] =
+  decodeFooLong join decodeBarString</span>
+
+<span class="fragment">// StringMap -> FooBar
+val fooBarDecoder: Decoder[StringMap, FooBar] =
+  fooBarTupleDecoder.map(FooBar.tupled)</span></code></pre>
+        </section>
+
+        <section id="map-adt2">
+          <h3>ADTs cont'd</h3>
+          <pre><code data-trim data-noescape>case class FooBar(foo: Long, bar: String)
+// StringMap -> FooBar
+val fooBarDecoder: Decoder[StringMap, FooBar] = // ...
+
+fooBarDecoder(Map.empty)
+// <span class="fragment">Left(And(AtPath(foo, Missing), AtPath(bar, Missing)))</span>
+
+fooBarDecoder(Map("foo" -> "it's foo", "bar" -> "it's bar"))
+// <span class="fragment">Left(AtPath(foo, WrongType(Long, Some(it's foo))))</span>
+
+fooBarDecoder(Map("foo" -> "9000", "bar" -> "it's bar"))
+// <span class="fragment">Right(FooBar(9000, it's bar))</span></code></pre>
+        </section>
+
+        <section id="map-adt-nested">
+          <h3>How about...</h3>
+          <pre><code data-trim data-noescape>Map("fooBar.foo" -> "9000", "fooBar.bar" -> "it's bar")
+
+<span class="fragment">// StringMap -> StringMap
+def decodeMapFromMap(key: String): Decoder[StringMap, StringMap] =
+  Decoder.instance(???)</span>
+
+<span class="fragment">// (StringMap -> StringMap) >>> (StringMap -> FooBar)
+//  StringMap -> FooBar
+val fooBarDecoderNested: Decoder[StringMap, FooBar] =
+  decodeMapFromMap("fooBar") andThen fooBarDecoder</span></code></pre>
+        </section>
+
+        <section id="map-adt-nested2">
+          <h3>nested paths</h3>
+          <pre><code data-trim data-noescape>// StringMap -> StringMap
+def decodeMapFromMap(key: String): Decoder[StringMap, StringMap] =
+  Decoder.instance { map =>
+    // filter all keys by prefix `key`, and remove prefix
+    val filtered = map.toList
+      .collect {
+        case (path, value) if path.startsWith(s"$key.") =>
+          path.stripPrefix(s"$key.") -> value
+      }
+      .toMap
+    if (filtered.isEmpty)
+      Left(DecodeError.AtPath(key, DecodeError.Missing))
+    else
+      Right(filtered)
+  }</code></pre>
+        </section>
+
+        <section id="map-adt-nested3">
+          <h3>nested paths cont'd</h3>
+          <pre><code data-trim data-noescape>// StringMap -> FooBar
+val fooBarDecoder: Decoder[StringMap, FooBar] = // ...
+
+// (StringMap -> StringMap) >>> (StringMap -> FooBar)
+//  StringMap -> FooBar
+val fooBarDecoderNested: Decoder[StringMap, FooBar] =
+  decodeMapFromMap("fooBar") andThen fooBarDecoder
+
+fooBarDecoderNested(Map("foo" -> "9000", "bar" -> "it's bar"))
+// <span class="fragment">Left(AtPath(fooBar, Missing))</span>
+
+fooBarDecoderNested(Map("fooBar.foo" -> "9000", "fooBar.bar" -> "it's bar"))
+// <span class="fragment">Right(FooBar(9000, it's bar))</span></code></pre>
+        </section>
+
+        <section id="clean">
+          <h3>Clean things up with a type class</h3>
+          <pre><code data-trim data-noescape><span class="fragment">// String -> StringMap -> StringMap
+implicit val stringMapReadStringMap: Read[StringMap, StringMap] =
+  Read.instance(decodeMapFromMap)</span>
+
+val fooBarDecoderNested: Decoder[StringMap, FooBar] =
+  fooBarDecoder.atPath("fooBar") // looks for an implicit "Read"</code></pre>
+        </section>
+
+        <section id="cleaner">
+          <h3>Extra clean</h3>
+          <pre><code data-trim data-noescape>case class FooBar(foo: Long, bar: String)
+
+val decodeNestedFooBar: Decoder[StringMap, FooBar] =
+  (
+    Read[StringMap, Long]("foo")
+    join
+    Read[StringMap, String]("bar")
+  )
+    .map(FooBar.tupled).atPath("fooBar")</code></pre>
+        </section>
+
+        <section id="cleaner">
+          <h3>Shapeless clean</h3>
+          <pre><code data-trim data-noescape>case class FooBar(foo: Long, bar: String)
+
+import classy.generic._
+
+val decodeNestedFooBar: Decoder[StringMap, FooBar] =
+  deriveDecoder[StringMap, FooBar].atPath("fooBar")</code></pre>
+        </section>
+
+
+        <section id="wat">
+          <h3>What did we do?</h3>
+          <ul>
+            <li>Built decoders for values from a Map <br/><small><i>arrows</i></small></li>
+            <li class="fragment">Built a decoder for reading "nested" data<br /><small><i>arrow composition</i></small></li>
+            <li class="fragment">Decoded a case class<br /><small><i>arrow products</i></small></li>
+            <li class="fragment">Made decoding cleaner with implicits</li>
+            <li class="fragment">Used shapeless with our implicits</li>
+          </ul>
+        </section>
+
+        <section id="why">
+          <h3>Why?</h3>
+<pre><code data-trim data-noescape>sealed abstract class Shape extends Product with Serializable
+object Shape {
+  final case class Circle(radius: Double) extends Shape
+  final case class Square(dimension: Double) extends Shape
+  final case class Rectangle(length: Double, width: Double)
+    extends Shape
+  final case class Triangle(base: Double, height: Double)
+    extends Shape
+  final case class RegularPolygon(dimension: Double, sides: Long)
+    extends Shape
+}
+case class Shapes(shapes: List[Shape])
+
+<span class="fragment">// so we can be lazy
+val decodeShapes = deriveDecoder[String, Shapes].fromString</span>
+</code></pre>
+        </section>
+
+        <section id="why2">
+          <h3>Why? cont'd</h3>
+          <table>
+            <tr>
+              <td>
+                <pre><code data-trim data-noescape>shapes: [
+  { circle { radius: 2 } },
+  { rectangle {} },
+  { square { dimension: 2 } },
+  { square {} }
+]
+</code></pre>
+              </td>
+              <td>
+                <pre><code data-trim data-noescape><span class="fragment">Left(AtPath("shapes",
+  And(
+    AtIndex(1, Or(
+      AtPath("circle", Missing),
+      AtPath("rectangle", And(
+        AtPath("length", Missing),
+        AtPath("width", Missing))),
+      AtPath("regularPolygon", Missing),
+      AtPath("square", Missing),
+      AtPath("triangle", Missing))),
+     AtIndex(3, Or(
+      // ...</span></code></pre>
+              </td>
+            </tr>
+          </table>
+        </section>
+
+        <section id="coming-soon">
+          <h3>Next Steps</h3>
+          <ul>
+            <li>error pretty printing</li>
+            <li>options for derived decoders <br /><small><i>(some already exist)</i></small></li>
+            <li>support for more input types</li>
+            <li>integration with freestyle</li>
+          </ul>
+        </section>
+
+        <!-- FIN! -->
+
+        <section id="fin"
+          data-background-image="img/jumbotron_pattern2x.png"
+          data-background-size="45px 40px"
+          data-background-repeat="repeat"
+          data-background-transition="fade-in fade-out"
+        >
+          <img src="img/navbar_brand2x.png" class="plain"/>
+          <div><small>github: <a href="https://github.com/47deg/case-classy">47deg/case-classy</a></small></div>
+          <div><small>twitter: <a href="https://twitter.com/andygscott">@andygscott</a> <a href="https://twitter.com/47deg">@47deg</a></small></div>
+          <br />
+          <img src="img/47deg.png" class="plain" style="width: 70px; height: auto; opacity: 0.7;"/>
         </section>
 
 
@@ -291,7 +560,8 @@ val decodeString: Decoder[String, UUID] = decodeConfig.fromString</span>
       });
 
       Reveal.initialize({
-        transition: 'none'
+        transition: 'none',
+        width: '75%'
       });
 
       hljs.initHighlightingOnLoad();
