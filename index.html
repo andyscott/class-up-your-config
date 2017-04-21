@@ -338,7 +338,7 @@ decodeBarString(Map("bar" -> "it's bar"))
 val decodeFooLong: Decoder[StringMap, Long] = // ...
 val decodeBarString: Decoder[StringMap, String] = // ...
 
-<span class="fragment">// (Map[String, String] -> Long) * (Map[String, String] -> String)
+<span class="fragment">// (StringMap -> Long) &&& (StringMap -> String)
 //  StringMap -> (Long, String)</span>
 <span class="fragment">val fooBarTupleDecoder: Decoder[StringMap, (Long, String)] =
   decodeFooLong join decodeBarString</span>
@@ -448,7 +448,6 @@ val decodeNestedFooBar: Decoder[StringMap, FooBar] =
   deriveDecoder[StringMap, FooBar].atPath("fooBar")</code></pre>
         </section>
 
-
         <section id="wat">
           <h3>What did we do?</h3>
           <ul>
@@ -475,8 +474,8 @@ object Shape {
 }
 case class Shapes(shapes: List[Shape])
 
-<span class="fragment">// so we can be lazy
-val decodeShapes = deriveDecoder[String, Shapes].fromString</span>
+<span class="fragment">val decodeShapes: Decoder[String, Shapes] =
+  deriveDecoder[Config, Shapes].fromString</span>
 </code></pre>
         </section>
 
@@ -490,11 +489,8 @@ val decodeShapes = deriveDecoder[String, Shapes].fromString</span>
   { rectangle {} },
   { square { dimension: 2 } },
   { square {} }
-]
-</code></pre>
-              </td>
-              <td>
-                <pre><code data-trim data-noescape><span class="fragment">Left(AtPath("shapes",
+]</code></pre>
+<pre><code data-trim data-noescape><span class="fragment">Left(AtPath("shapes",
   And(
     AtIndex(1, Or(
       AtPath("circle", Missing),
@@ -507,17 +503,100 @@ val decodeShapes = deriveDecoder[String, Shapes].fromString</span>
      AtIndex(3, Or(
       // ...</span></code></pre>
               </td>
+              <td>
+<pre><code data-trim data-noescape><span class="fragment">// error.toPrettyString
+errors.shapes (conjunction/AND):
+  [1] (disjunction/OR):
+    circle: missing value
+    rectangle (conjunction/AND):
+      length: missing value
+      width: missing value
+    regularPolygon: missing value
+    square: missing value
+    triangle: missing value
+  [3] (disjunction/OR):
+    circle: missing value
+    rectangle: missing value
+    regularPolygon: missing value
+    // ...</span></code></pre>
+              </td>
             </tr>
           </table>
+        </section>
+
+                <section id="goodies">
+          <h2>Other goodies & features</h2>
+        </section>
+
+        <section>
+          <pre><code data-trim data-noescape>// decode default application.conf from the classpath
+// without importing com.typesafe.config._
+import classy._
+import classy.config._
+import classy.generic.auto._
+
+case class Entry(host: String, port: Int)
+case class Services(users: Entry, database: Entry)
+
+
+
+val res: Either[DecodeError, Services] =
+  ConfigDecoder[Services].atPath("services").load() // calls ConfigFactory.load()
+</code></pre>
+        </section>
+
+        <section>
+          <pre><code data-trim data-noescape>// decode a properties file
+
+import classy._
+import classy.stringMap._
+import classy.generic.auto._
+
+case class Entry(host: String, port: Int)
+case class Services(users: Entry, database: Entry)
+
+val props: java.util.Properties = // ..
+
+val res: Either[DecodeError, Services] =
+  StringMapDecoder[Services].atPath("services").fromProperties(props)
+</code></pre>
+        </section>
+
+        <section>
+          <pre><code data-trim data-noescape>// pretty printing errors
+sealed trait FooBar
+case class Foo(value: String) extends FooBar
+case class Bar(value: String) extends FooBar
+case class Config(
+  fooBar: FooBar, maybeFooBar: Option[FooBar], listFooBar: List[FooBar])
+
+val decoder = StringMapDecoder[Config]     // stdout>
+decoder(Map(                               // errors (conjunction/AND):
+  "listFooBar[0].foo.value" -> "it's foo", //  fooBar: missing value
+  "listFooBar[1].bar"       -> "")         //  listFooBar[0] (disjunction/OR):
+).fold(                                    //    bar: missing value
+  e => println(e.toPrettyString),          //    foo: missing value
+  s => println(s))
+</code></pre>
+        </section>
+
+        <section>
+          <h3>Features / Miscellany</h3>
+          <ul>
+            <li>Scala 2.11 and 2.12</li>
+            <li>Scala.js support<br /><small><i>(including com.typesafe.config.Config)</i></small></li>
+            <br />
+            <li>Modularized<br /><small><i>core module has no dependencies</i></small></li>
+            <li>Typelevel incubator project</li>
+          </ul>
         </section>
 
         <section id="coming-soon">
           <h3>Next Steps</h3>
           <ul>
-            <li>error pretty printing</li>
-            <li>options for derived decoders <br /><small><i>(some already exist)</i></small></li>
-            <li>support for more input types</li>
-            <li>integration with freestyle</li>
+            <li>settings to configure derived decoders <br /><small><i>(some already exist)</i></small></li>
+            <li>support for decoding more input types</li>
+            <li>integration with freestyle <a href="http://frees.io/">(http://frees.io/)</a></li>
           </ul>
         </section>
 
