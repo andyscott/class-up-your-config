@@ -37,6 +37,7 @@
             <li>What's the problem?</li>
             <li class="fragment">Build a solution using Case Classy</li>
             <li class="fragment">Learn about arrows and FP</li>
+            <li class="fragment">Other goodies</li>
           </ul>
         </section>
 
@@ -60,10 +61,7 @@ nodaemon=false                                  ; run supervisord as a daemon
 minfds=1024                                     ; number of startup file descriptors
 minprocs=200                                    ; number of process descriptors
 user=root                                       ; default user
-childlogdir=/var/log/supervisord/               ; where child log files will live
-
-[rpcinterface:supervisor]
-supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface</code></pre>
+childlogdir=/var/log/supervisord/               ; where child log files will live</code></pre>
         </section>
 
         <section>
@@ -73,8 +71,8 @@ play.evolutions.db.default.autoApply=true
 
 db.default.driver=org.postgresql.Driver
 db.default.url="jdbc:postgresql://localhost:5432/scalaexercises_dev"
-db.default.username=scalaexercises_dev_user <span class="fragment" data-fragment-index="1">⬅</span>
-db.default.password=scalaexercises_pass     <span class="fragment" data-fragment-index="1">⬅</span>
+db.default.username=scalaexercises_dev_user
+db.default.password=scalaexercises_pass
 db.default.url=${?DATABASE_URL}</code></pre>
           <span class="fragment" data-fragment-index="1">sensitive info?</span>
         </section>
@@ -94,20 +92,20 @@ java $JAVA_OPTIONS $JAVA_PROPERTIES -jar $SBT_JAR "$@"</code></pre>
           <h3>loading config</h3>
           <pre><code class="scala" data-trim data-noescape>trait AkkaClientConfig extends Config {
   protected val akkaConfig =
-    config.getConfig("akka.http.client")<span class="fragment" data-fragment-index="1">🔥</span>
+    config.getConfig("akka.http.client")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
 }
 trait KafkaConfig extends Config {
-  protected val kafkaConfig = config.getConfig("kafka")<span class="fragment" data-fragment-index="1">🔥</span>
+  protected val kafkaConfig = config.getConfig("kafka")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
 }
 
 object ServiceConfig extends AkkaServerConfig {
-  protected val http = akkaConfig.getConfig("server")<span class="fragment" data-fragment-index="1">🔥</span>
-  val host = http.getString("host")<span class="fragment" data-fragment-index="1">🔥</span>
-  val port = http.getInt("port")<span class="fragment" data-fragment-index="1">🔥</span>
-  val requestTimeout = http.getString("request-timeout")<span class="fragment" data-fragment-index="1">🔥</span>
-  val systemName = http.getString("system")<span class="fragment" data-fragment-index="1">🔥</span>
+  protected val http = akkaConfig.getConfig("server")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
+  val host = http.getString("host")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
+  val port = http.getInt("port")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
+  val requestTimeout = http.getString("request-timeout")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
+  val systemName = http.getString("system")<span class="fragment" data-fragment-index="1"><img class="plain fire" src="img/fire-emoji.png"/></span>
 }</code></pre>
-          <h2 class="fragment">ocassionally</h2>
+          <h2 class="fragment">occasionally</h2>
         </section>
 
         <section id="burn"
@@ -117,7 +115,7 @@ object ServiceConfig extends AkkaServerConfig {
                  data-transition="zoom-in fade-out"
                  data-transition-speed="slow"
         >
-          <h3>🔥 🔥 🔥 🔥</h3>
+          <h3><img class="plain fire" src="img/fire-emoji.png"/> <img class="plain fire" src="img/fire-emoji.png"/> <img class="plain fire" src="img/fire-emoji.png"/> <img class="plain fire" src="img/fire-emoji.png"/></h3>
           <pre><code data-trim data-noescape>com.typesafe.config.ConfigException$Missing: No configuration setting found for key 'mongo-async-driver'
   at com.typesafe.config.impl.SimpleConfig.findKey(SimpleConfig.java:115)
   at com.typesafe.config.impl.SimpleConfig.find(SimpleConfig.java:136)
@@ -204,7 +202,7 @@ object ServiceConfig extends AkkaServerConfig {
 
         <section id="uuid">
           <h3>Decoding String -> UUID</h3>
-          <pre><code data-trim data-noescape>import classy.core._
+          <pre><code data-trim data-noescape>import classy._
 import java.util.UUID
 import scala.util.Try
 
@@ -243,8 +241,7 @@ import com.typesafe.config.{ Config, ConfigFactory }
 val readIdString: Decoder[Config, String] =
   readConfig[String]("id")
 
-// (Config -> String) >>> (String -> UUID)
-<span class="fragment">//  Config -> UUID
+// (Config -> String) >>> (String -> UUID)<span class="fragment">: Config -> UUID
 val decodeConfig: Decoder[Config, UUID] =
   readIdString andThen decodeUUID</span>
 
@@ -262,22 +259,21 @@ val decodeConfig: Decoder[Config, UUID] = // ...
 decodeConfig(ConfigFactory.parseString("id = whoops"))
 // Left(WrongType(UUID, Some(whoops)))
 
-// (String -> Config) >>> (Config -> UUID)
-<span class="fragment">//  String -> UUID
+// (String -> Config) >>> (Config -> UUID)<span class="fragment">: String -> UUID
 val decodeString: Decoder[String, UUID] = decodeConfig.fromString</span>
 
 <span class="fragment">decodeString("id = whoops")
 // Left(WrongType(UUID, Some(whoops)))</span></code></pre>
         </section>
 
-
         <section id="premap">
           <ul>
-            <li>It will be boring if I keep decoding with Typesafe's Config</li>
-            <li class="fragment"><i>(it's been done a few times before)</i></li>
+            <li>decoding with Typesafe's Config is boring</li>
+            <li class="fragment" data-fragment-index="0"><i>(it's been done many times)</i></li>
             <br />
-            <li class="fragment">Let's decode from <code>Map[String, String]</code> from scratch</li>
-            <li class="fragment"><i>System/env props are exposed this way</i></li>
+            <li class="fragment" data-fragment-index="1">Let's decode from <code>Map[String, String]</code> from scratch</li>
+            <li class="fragment" data-fragment-index="2"><i>sys.env props are exposed this way</i></li>
+            <li class="fragment" data-fragment-index="2"><i>also property files with java.util.Properties</i></li>
         </section>
 
         <!-- Map -->
@@ -434,11 +430,12 @@ val fooBarDecoderNested: Decoder[StringMap, FooBar] =
 
 val decodeNestedFooBar: Decoder[StringMap, FooBar] =
   (
-    Read[StringMap, Long]("foo")
-    join
-    Read[StringMap, String]("bar")
-  )
-    .map(FooBar.tupled).atPath("fooBar")</code></pre>
+    Read[StringMap, Long]("foo")   <span class="fragment" data-fragment-index="0">// (StringMap -> Long)</span>
+    join                           <span class="fragment" data-fragment-index="0">//  &&&    'fanout'</span>
+    Read[StringMap, String]("bar") <span class="fragment" data-fragment-index="0">// (StringMap -> String)</span>
+  )                                <span class="fragment" data-fragment-index="0">//  : StringMap -> (Long, String)</span>
+    .map(FooBar.tupled)            <span class="fragment" data-fragment-index="1">//  ... map result
+    .atPath("fooBar")              <span class="fragment" data-fragment-index="2">//  : StringMap -> FooBar</span></code></pre>
         </section>
 
         <section id="cleaner">
@@ -457,7 +454,7 @@ val decodeNestedFooBar: Decoder[StringMap, FooBar] =
           <ul>
             <li>Built decoders for values from a Map <br/><small><i>arrows</i></small></li>
             <li class="fragment">Built a decoder for reading "nested" data<br /><small><i>arrow composition</i></small></li>
-            <li class="fragment">Decoded a case class<br /><small><i>arrow products</i></small></li>
+            <li class="fragment">Decoded a case class<br /><small><i>arrow products (fanout)</i></small></li>
             <li class="fragment">Made decoding cleaner with implicits</li>
             <li class="fragment">Used shapeless with our implicits</li>
           </ul>
